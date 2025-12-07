@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>moodlog</title>
+
+
+<style>
+    h1{
+        width: 900px;
+        text-align: center;
+        margin: 0;
+    }
+
+    #today {
+    width: 900px;
+    text-align: center;
+    margin: 0 0 5px;
+    color: #666;
+    font-size: 20px;
+}
+
+    /* 気分アイコン用 */
+    .mood-tabs{
+        width: 900px;
+        text-align: center;
+    }
+    
+    .mood-tab{
+        width: 32px;
+        height: 32px;
+        margin: 12px;
+        border-radius: 50%;
+        border: none;
+        background: #fff;
+        cursor: pointer;
+        font-size: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .mood-tab:hover{
+        transform:scale(1.1);
+        transition: transform 0.1s;
+    }
+
+    .mood-tab-img{
+        width: 30px;
+        height: 30px;
+        object-fit: contain;
+}
+    .mood-tab.selected{
+        transform: scale(1.7);
+        border: 1.5px solid #fff;
+        background: #fff;
+    }
+
+    #output p {
+        border-bottom: 1px solid #ccc; /* 下線の色と太さ */
+        padding: 4px 0;               /* 行と線の間の余白 */
+        margin: 0;                    /* 段落のデフォルト余白を消す */
+}
+
+#text {
+    padding: 10px;
+    height: 50px;
+    width: 900px;   
+    font-size: 15px;    
+    box-sizing: border-box;
+}
+
+#output {
+    padding: 15px;
+    height: 300px;
+    width: 900px;      
+    overflow: auto;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+
+/* アイコン用 */
+    .icon {
+        width: 20px;
+        height: auto;
+        padding: 3px;
+        cursor: pointer;
+        vertical-align: middle;
+    }
+</style>
+</head>
+<body>
+
+<!-- コンテンツ表示画面 -->
+
+<h1>Moodlog</h1>
+<p id="today"></p>  
+<div>
+    
+    <!-- 気分タブ（アイコンボタン） -->
+    <div class="mood-tabs">
+        <button type="button" class="mood-tab" data-score="1"><img src="./img/1.png" alt="" class="mood-tab-img"></button>
+        <button type="button" class="mood-tab" data-score="2"><img src="./img/2.png" alt="" class="mood-tab-img"></button>
+        <button type="button" class="mood-tab" data-score="3"><img src="./img/3.png" alt="" class="mood-tab-img"></button>
+        <button type="button" class="mood-tab" data-score="4"><img src="./img/4.png" alt="" class="mood-tab-img"></button>
+        <button type="button" class="mood-tab" data-score="5"><img src="./img/5.png" alt="" class="mood-tab-img"></button>
+    </div>
+
+    <div>
+        <textarea id="text" cols="30" rows="10"></textarea>
+        <button id="send">送信</button>
+    </div>
+    <div id="output"></div>
+</div>
+<!--/ コンテンツ表示画面 -->
+
+
+    <!-- 選ばれたスコアを格納しておく隠し入力 -->
+    <input type="hidden" id="moodscore">
+
+
+<!-- JQuery -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<!-- JQuery -->
+
+
+<!--** 以下Firebase **-->
+<script type="module">
+  // Import the functions you need from the SDKs you need
+//アカウントで接続↓↓
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+//https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js"のバージョン（12.6.0）は最新の方に合わせる！！
+import { getDatabase, ref, push, set, update, remove, onChildAdded, onChildChanged,  onChildRemoved } 
+from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+const firebaseConfig = {
+    apiKey: XXXXXXXXXXXXX,
+    authDomain: XXXXXXXXXXXXX,
+    databaseURL: XXXXXXXXXXXXX,
+    projectId: XXXXXXXXXXXXX,
+    storageBucket: XXXXXXXXXXXXX,
+    messagingSenderId: XXXXXXXXXXXXX,
+    appId: XXXXXXXXXXXXX,
+    measurementId: XXXXXXXXXXXXX,
+    };
+
+  // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+  //↓ "chat"というファイル名なのでchat。作った名前で。
+    const dbRef = ref(db, "chat");
+
+    const todayStr = () =>{
+    const d = new Date();
+    return d.toISOString().slice(0,10);
+};
+
+// ★ 画面上部に今日の日付を表示
+document.getElementById("today").textContent = todayStr();
+
+// 気分ボタン（.mood-tab）がクリックされたときの処理
+    $(".mood-tab").on("click", function(){
+    const score =$(this).data("score");
+// hidden にスコアを保存（送信時に使う）
+$("#moodscore").val(score);
+// 見た目：一度全部の選択状態を外してから、自分だけ selected にする
+$(".mood-tab").removeClass("selected");
+$(this).addClass("selected");
+});
+
+
+  //送信イベント
+  $("#send").on("click",function(){
+const msg ={
+    date: todayStr(),
+    mood: $("#moodscore").val(),  
+    text: $("#text").val()
+};
+
+const newPostRef = push(dbRef); //UNIQUE_KEY生成（重複しないKEY）
+set(newPostRef, msg);           //setItemされます。（key, value)
+ $("#text").val("");   // ここで入力欄リセット
+  });
+
+//受信イベント
+onChildAdded(dbRef, function(data){
+    const msg = data.val(); //オブジェクト変数にして受け取る
+    const key = data.key; //UNIQUE＿KEYの取得（更新・削除）関数ではないので注意
+    let h = '<p id="' + key + '">';
+
+//日付
+h += msg.date + ' ｜ ';
+
+// 気分（数値 or 画像）
+    h += '<img src="./img/' + msg.mood + '.png" class="mood-tab-img"> ｜ '; 
+
+    // メモ（編集可能にするなら contentEditable のままでもOK）
+  h += '<span contentEditable="true" id="' + key + '_update">' + msg.text + '</span>';
+// ★削除アイコン（画像）
+h += ' <span class="remove" data-key="' + key + '">';
+h += '<img src="./img/trashbin.png" class="icon" alt="削除">';
+h += '</span>';
+// 更新アイコン（画像）
+h += ' <span class="update" data-key="' + key + '">';
+h += '<img src="./img/refresh.png" class="icon" alt="更新">';
+h += '</span>';
+    h += "</p>";
+    $("#output").prepend(h); //prependにすると新しいものが上にくる
+});
+
+//削除イベント
+$("#output").on("click", ".remove", function(){
+    const key = $(this).attr("data-key");
+    const removeRef = ref(db, "chat/"+key);
+    remove(removeRef); //Firebaseデータ削除関数
+});
+
+//更新イベント
+$("#output").on("click", ".update", function(){
+    const key = $(this).attr("data-key");
+    update(ref(db, "chat/"+key),{
+        text: $("#" + key + "_update").html()
+    });
+});
+
+// リアルタイム削除反映
+onChildRemoved(dbRef, (data) =>{
+    $("#" +data.key).remove();
+});
+
+// リアルタイム更新反映
+onChildChanged(dbRef, (data) => {
+  const msg = data.val();
+  $("#" + data.key + "_update").html(msg.text);
+  $("#" + data.key + "_update").fadeOut(800).fadeIn(800);
+});
+
+
+</script>
+</body>
+</html>
